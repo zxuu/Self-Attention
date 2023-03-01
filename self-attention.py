@@ -24,18 +24,18 @@ class SelfAttention(nn.Module):
         batch, n, dim_embedding = x.shape
         assert dim_embedding == self.dim_embedding
 
-        q = self.linear_q(x)  # batch, sequence_length, dim_embedding
+        q = self.linear_q(x)  # batch, sequence_length, dim_qk
         print(q.shape)
-        k = self.linear_k(x)  # batch, sequence_length, dim_embedding
+        k = self.linear_k(x)  # batch, sequence_length, dim_qk
         print(k.shape)
-        v = self.linear_v(x)  # batch, sequence_length, dim_embedding
+        v = self.linear_v(x)  # batch, sequence_length, dim_v
         print(v.shape)
         # q*k的转置 并*开根号后的dk
         dist = torch.bmm(q, k.transpose(1, 2)) * self._norm_fact  # batch, sequence_length, sequence_length
         # 归一化获得attention的相关系数
         dist = torch.softmax(dist, dim=-1)  # batch, sequence_length, sequence_length
         # attention注意力分数和v相乘，获得最终的得分
-        att = torch.bmm(dist, v)
+        att = torch.bmm(dist, v)    # batch, sequence_length, dim_v
         return att
 
 # Inputs to the attention module
@@ -66,3 +66,35 @@ x_gen = torch.randn(batch_size, sequence_length, dim_embedding)
 attention = SelfAttention(dim_embedding, dim_QK, dim_V)
 att = attention(x_gen)
 print(att)
+
+'''
+torch.Size([3, 4, 7])
+torch.Size([3, 4, 7])
+torch.Size([3, 4, 8])
+tensor([[[-0.4412, -0.0058,  0.1688,  0.1000,  0.0466, -0.1683, -0.0394,
+           0.2754],
+         [-0.3798, -0.0876,  0.2759,  0.0985, -0.0560, -0.1206, -0.1126,
+           0.3128],
+         [-0.4644,  0.0478,  0.0520,  0.1308,  0.0934, -0.2276, -0.0629,
+           0.2487],
+         [-0.3546,  0.0226,  0.0430,  0.1605,  0.1323, -0.2357, -0.2485,
+           0.2488]],
+
+        [[-0.1702,  0.1003, -0.4977,  0.1556, -0.5716, -0.0261, -0.1420,
+          -0.4927],
+         [-0.3445,  0.1848, -0.2244, -0.0078, -0.0720, -0.1128,  0.2392,
+          -0.2389],
+         [-0.3085,  0.1496, -0.3384,  0.0939, -0.2209, -0.1023,  0.0691,
+          -0.2521],
+         [-0.2479,  0.1278, -0.4098,  0.1205, -0.3815, -0.0670, -0.0230,
+          -0.3634]],
+
+        [[-0.2354, -0.2021, -0.0544,  0.2750, -0.6558,  0.1107, -0.0472,
+           0.2720],
+         [-0.1813, -0.2203, -0.0562,  0.2713, -0.6875,  0.1511, -0.0492,
+           0.2558],
+         [-0.1554, -0.2288, -0.0595,  0.2713, -0.7081,  0.1714, -0.0629,
+           0.2365],
+         [-0.0234, -0.2705, -0.0802,  0.2698, -0.8181,  0.2722, -0.1303,
+           0.1331]]], grad_fn=<BmmBackward0>)
+'''
