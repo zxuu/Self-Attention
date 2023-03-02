@@ -75,7 +75,7 @@ class MultiHeadAttention(nn.Module):
         n_batch = query.size(0)
 
         # 多头需要对这个 X 切分成多头
-        #Q[3,4,512],K[b,s,dim_QK],V[b,s,dim_V]
+        #Q[b,4,16],K[b,4,16],V[b,4,16]
         temp = self.linear_query(query)    # [b,4,16]
         # 16截断为[8,2]  -1：这一维度自适应
         temp2 = temp.view(n_batch, -1, self.head, self.d_k)    # [b,4,8,2]
@@ -88,11 +88,9 @@ class MultiHeadAttention(nn.Module):
 
 
         x, self.attn = self.self_attention(query, key, value, mask=mask)    # [b,8,4,2]
-        # [b,8,32,64]
-        # [b,32,512]
-        # 变为三维， 或者说是concat head
-        x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.head * self.d_k)    # [3,4,16]
-        x = self.linear_out(x)    # [3,4,16]
+        # 变为三维， 或者说是concat head(拼接各个head-attention的结果)
+        x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.head * self.d_k)    # [b,4,16]
+        x = self.linear_out(x)    # [b,4,16]
         print(x.shape)
         return x
 
