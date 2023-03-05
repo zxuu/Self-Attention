@@ -24,5 +24,5 @@
 </div>  
 
 
-# 关于掩码Mask  
+# 关于掩码Mask详见该博客：[自注意力中的不同的掩码介绍以及他们是如何工作的？](https://www.cnblogs.com/nickchen121/p/10718112.html "自注意力中的不同的掩码介绍以及他们是如何工作的？")  
 ![](https://github.com/zxuu/Self-Attention/blob/main/Pictures/Encoder_Mask.png)
