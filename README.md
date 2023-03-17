@@ -9,3 +9,6 @@
 **Train文件夹**是训练部分  
 **Test文件夹**是测试部分  
 **Utils文件夹**是工具包，包括一些常量的定义，还有Dataloader  
+  
+---  
+**Transformer.py**是完整的transformer构建、数据输入、测试的例子
