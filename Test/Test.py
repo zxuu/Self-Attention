@@ -5,7 +5,7 @@
 #@Software: PyCharm
 import torch
 import torch.utils.data as Data
-
+from Z_NLP.Transformer.Train.Train import model
 from Z_NLP.Transformer.Transformer.My_transformer import Transformer
 from Z_NLP.Transformer.Utils.Constants import tgt_len, tgt_vocab, src_idx2word, idx2word, src_vocab, sentences
 from Z_NLP.Transformer.Utils.DataLoader import loader
@@ -27,7 +27,7 @@ sentences = [['我 是 学 生 P', 'S I am a student', 'I am a student E'],  # S
 
 
 
-model = Transformer()
+# model = Transformer()
 
 def test(model, enc_input, start_symbol):
     enc_outputs, enc_self_attns = model.Encoder(enc_input)
