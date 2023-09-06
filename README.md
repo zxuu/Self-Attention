@@ -23,3 +23,10 @@ sentences = [['我 是 学 生 P' , 'S I am a student'   , 'I am a student E'], 
              ['我 喜 欢 学 习', 'S I like learning P', 'I like learning P E'],      # E: 结束符号
              ['我 是 男 生 P' , 'S I am a boy'       , 'I am a boy E']]             # P: 占位符号，如果当前句子不足固定长度用P占位 pad补0
 ```
+**My_transformer.py输出**
+```bash
+......
+Epoch: 0050 loss = 0.088758
+Epoch: 0050 loss = 0.003786
+['我', '是', '学', '生', 'P'] -> ['I', 'am', 'a', 'student', 'E']
+```
