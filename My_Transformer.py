@@ -411,7 +411,7 @@ optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.99)
 # 训练Transformer
 因为batch=2，所以一个epoch有两个loss
 '''
-for epoch in range(2):
+for epoch in range(50):
     for enc_inputs, dec_inputs, dec_outputs in loader:
         enc_inputs, dec_inputs, dec_outputs = enc_inputs, dec_inputs, dec_outputs
         outputs, enc_self_attns, dec_self_attns, dec_enc_attns = model(enc_inputs, dec_inputs)
