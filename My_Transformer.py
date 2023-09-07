@@ -61,7 +61,7 @@ loader = Data.DataLoader(MyDataSet(enc_inputs, dec_inputs, dec_outputs), 2, True
 
 d_model = 512   # 字 Embedding 的维度
 d_ff = 2048     # 前向传播隐藏层维度
-d_k = d_v = 64  # K(=Q), V的维度
+d_k = d_v = 64  # K(=Q), V的维度. V的维度可以和K=Q不一样
 n_layers = 6    # 有多少个encoder和decoder
 n_heads = 8     # Multi-Head Attention设置为8
 
@@ -124,9 +124,9 @@ class ScaledDotProductAttention(nn.Module):
         :return:
         '''
         scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(d_k)   # scores : [batch_size, n_heads, len_q, len_k]
-        scores.masked_fill_(attn_mask, -1e9)                           # 如果是停用词P就等于 0 在原tensor修改
+        scores.masked_fill_(attn_mask, -1e9)                           # 如果是停用词P就等于负无穷 在原tensor修改
         temp  = scores
-        attn = nn.Softmax(dim=-1)(scores)
+        attn = nn.Softmax(dim=-1)(scores)    # mask位置变为0
         context = torch.matmul(attn, V)                                # [batch_size, n_heads, len_q, d_v]
         return context, attn
 
@@ -149,7 +149,7 @@ class MultiHeadAttention(nn.Module):
         :param input_Q: enc_inputs: 词嵌入、位置嵌入之后的矩阵
         :param input_K: enc_inputs: 词嵌入、位置嵌入之后的矩阵
         :param input_V: enc_inputs: 词嵌入、位置嵌入之后的矩阵
-        :param attn_mask: enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F
+        :param attn_mask: enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的位置是要掩码的位置
         :return:
         '''
         residual, batch_size = input_Q, input_Q.size(0)
@@ -192,8 +192,8 @@ class EncoderLayer(nn.Module):
 
     def forward(self, enc_inputs, enc_self_attn_mask):                                # enc_inputs: [batch_size, src_len, d_model]
         '''
-        :param enc_inputs: 词嵌入、位置嵌入之后的矩阵
-        :param enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F
+        :param enc_inputs: [batch_size, src_len, d_model] 词嵌入、位置嵌入之后的输入矩阵
+        :param enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的是要掩码的位置
         :return:
         '''
         #输入3个enc_inputs分别与W_q、W_k、W_v相乘得到Q、K、V                             # enc_self_attn_mask: [batch_size, src_len, src_len]
@@ -221,7 +221,7 @@ class Encoder(nn.Module):
 
     def forward(self, enc_inputs):
         '''
-        enc_inputs: [batch_size, src_len]
+        enc_inputs: [batch_size, src_len] 元素是字典词index
         '''
         enc_outputs = self.src_emb(enc_inputs) # [batch_size, src_len, d_model]
         enc_outputs = self.pos_emb(enc_outputs.transpose(0, 1)).transpose(0, 1) # [batch_size, src_len, d_model]
