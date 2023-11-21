@@ -6,24 +6,20 @@
 **Encoder文件夹**下是Ecoder编码器的完整实现（有mask）  
 **Decoder文件夹**下是Decoder解码器的完整实现（有mask）  
 **Transformer文件夹**下是把Encoder和Decoder两部分的合并，形成完整的transformer结构  
-  
----  
+
 **Train文件夹**是训练部分  
 **Test文件夹**是测试部分  
 **Utils文件夹**是工具包，包括一些常量的定义，还有Dataloader  
-  
----  
-**My_Transformer.py**是完整的transformer构建、数据输入、测试的例子  
 
----  
-torch还有transformer的版本
+**My_Transformer.py**是完整的transformer构建、数据输入、测试的例子  
+# torch、transformer版本
 ```bash
 torch                          1.13.1+cu117
 torchaudio                     0.13.1+cu117
 torchvision                    0.14.1+cu117
 transformers                   4.26.1
 ```
-**输入例子**  
+# 输入例子
 ```python
              # Encoder_input    Decoder_input        Decoder_output
 sentences = [['我 是 学 生 P' , 'S I am a student'   , 'I am a student E'],         # S: 开始符号
@@ -31,7 +27,7 @@ sentences = [['我 是 学 生 P' , 'S I am a student'   , 'I am a student E'], 
              ['我 是 男 生 P' , 'S I am a boy'       , 'I am a boy E']]             # P: 占位符号，如果当前句子不足固定长度用P占位 pad补0
 ```
 
-**My_transformer.py输出(直接运行即可)**
+# My_transformer.py输出(直接运行即可)
 ```bash
 ......
 Epoch: 0050 loss = 0.088758
