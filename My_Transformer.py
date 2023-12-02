@@ -67,7 +67,7 @@ n_heads = 8     # Multi-Head Attention设置为8
 
 # 位置嵌入，position Embedding
 class PositionalEncoding(nn.Module):
-    def __init__(self,d_model,dropout=0.1,max_len=5000):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding,self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         pos_table = np.array([
@@ -76,8 +76,17 @@ class PositionalEncoding(nn.Module):
         pos_table[1:, 0::2] = np.sin(pos_table[1:, 0::2])                  # 字嵌入维度为偶数时
         pos_table[1:, 1::2] = np.cos(pos_table[1:, 1::2])                  # 字嵌入维度为奇数时
         self.pos_table = torch.FloatTensor(pos_table)               # enc_inputs: [seq_len, d_model]
-    def forward(self,enc_inputs):                                         # enc_inputs: [batch_size, seq_len, d_model]
-        enc_inputs += self.pos_table[:enc_inputs.size(1),:]
+
+    def forward(self,enc_inputs):
+        """_summary_
+
+        Args:
+            enc_inputs (_type_): nn.embedding() [seq_len, batch_size, d_model]
+
+        Returns:
+            _type_: _description_
+        """
+        enc_inputs += self.pos_table[:enc_inputs.size(1),:]   # 两个embedding相加，参考https://www.cnblogs.com/d0main/p/10447853.html
         return self.dropout(enc_inputs)
 
 '''
