@@ -150,14 +150,11 @@ class MultiHeadAttention(nn.Module):
 
         self.fc = nn.Linear(n_heads * d_v, d_model, bias=False)
 
-    def forward(self, input_Q, input_K, input_V, attn_mask):    # input_Q: [batch_size, len_q, d_model]
-                                                                # input_K: [batch_size, len_k, d_model]
-                                                                # input_V: [batch_size, len_v(=len_k), d_model]
-                                                                # attn_mask: [batch_size, seq_len, seq_len]
-        '''
-        :param input_Q: enc_inputs: 词嵌入、位置嵌入之后的矩阵
-        :param input_K: enc_inputs: 词嵌入、位置嵌入之后的矩阵
-        :param input_V: enc_inputs: 词嵌入、位置嵌入之后的矩阵
+    def forward(self, input_Q, input_K, input_V, attn_mask):
+        '''QKV同源，都来自enc_inputs
+        :param input_Q: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
+        :param input_K: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
+        :param input_V: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
         :param attn_mask: enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的位置是要掩码的位置
         :return:
         '''
