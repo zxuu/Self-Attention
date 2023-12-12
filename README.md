@@ -1,6 +1,8 @@
 # Self-Attention（pytorch实现）
 参考这篇博客[手撕Transformer Transformer输入输出细节以及代码实现（pytorch）](https://blog.51cto.com/u_14300986/5467368)  
-  
+<div align=center>
+<img src="./Pictures/transformer.png" width="300"/>
+</div>
 **OneHead文件夹**下是单头自注意力机制的实现(无Mask)  
 **MultiHead文件夹**下是多头自注意力机制的实现(无Mask)  
 **Encoder文件夹**下是Ecoder编码器的完整实现（有mask）  
