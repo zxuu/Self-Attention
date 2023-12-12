@@ -5,16 +5,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as Data
 
-             # Encoder_input    Decoder_input        Decoder_output
+             # Encoder_input    Decoder_input          Decoder_output
 sentences = [['我 是 学 生 P' , 'S I am a student'   , 'I am a student E'],         # S: 开始符号
              ['我 喜 欢 学 习', 'S I like learning P', 'I like learning P E'],      # E: 结束符号
              ['我 是 男 生 P' , 'S I am a boy'       , 'I am a boy E']]             # P: 占位符号，如果当前句子不足固定长度用P占位 pad补0
 
-
+# 以下的一个batch中是sentences[1,0]
 src_vocab = {'P':0, '我':1, '是':2, '学':3, '生':4, '喜':5, '欢':6,'习':7,'男':8}   # 词源字典  字：索引
 src_idx2word = {src_vocab[key]: key for key in src_vocab}
 src_vocab_size = len(src_vocab)                 # 字典字的个数
 
+# 生成目标中 'S'是0填充的
 tgt_vocab = {'S':0, 'E':1, 'P':2, 'I':3, 'am':4, 'a':5, 'student':6, 'like':7, 'learning':8, 'boy':9}
 idx2word = {tgt_vocab[key]: key for key in tgt_vocab}                               # 把目标字典转换成 索引：字的形式
 tgt_vocab_size = len(tgt_vocab)                                                     # 目标字典尺寸
@@ -25,15 +26,15 @@ tgt_len = len(sentences[0][1].split(" "))                                       
 # 把sentences 转换成字典索引
 def make_data(sentences):
     enc_inputs, dec_inputs, dec_outputs = [], [], []
-    for i in range(len(sentences)):
-      enc_input = [[src_vocab[n] for n in sentences[i][0].split()]]
-      dec_input = [[tgt_vocab[n] for n in sentences[i][1].split()]]
-      dec_output = [[tgt_vocab[n] for n in sentences[i][2].split()]]
+    for i in range(len(sentences)):    # 遍历每句话
+      enc_input = [[src_vocab[n] for n in sentences[i][0].split()]]    # Encoder_input 索引
+      dec_input = [[tgt_vocab[n] for n in sentences[i][1].split()]]    # Decoder_input 索引
+      dec_output = [[tgt_vocab[n] for n in sentences[i][2].split()]]    # Decoder_output 索引
       enc_inputs.extend(enc_input)
       dec_inputs.extend(dec_input)
       dec_outputs.extend(dec_output)
     return torch.LongTensor(enc_inputs), torch.LongTensor(dec_inputs), torch.LongTensor(dec_outputs)
-enc_inputs, dec_inputs, dec_outputs = make_data(sentences)
+enc_inputs, dec_inputs, dec_outputs = make_data(sentences)    # [3,5], [3,5], [3,5]
 print(enc_inputs)
 print(dec_inputs)
 print(dec_outputs)
@@ -57,7 +58,7 @@ class MyDataSet(Data.Dataset):
   def __getitem__(self, idx):
     return self.enc_inputs[idx], self.dec_inputs[idx], self.dec_outputs[idx]
 
-loader = Data.DataLoader(MyDataSet(enc_inputs, dec_inputs, dec_outputs), 2, True)
+loader = Data.DataLoader(MyDataSet(enc_inputs, dec_inputs, dec_outputs), 2, False)
 
 d_model = 512   # 字 Embedding 的维度
 d_ff = 2048     # 前向传播隐藏层维度
@@ -99,10 +100,25 @@ Mask句子中没有实际意义的占位符，例如’我 是 学 生 P’ ，P
 seq_data.data.eq(0) 就会返回 [False, False, False, False, True]
 '''
 def get_attn_pad_mask(seq_q, seq_k):
+    """
+    句子0填充
+    Args: 在Encoder_self_att中，seq_q，seq_k 就是enc_input
+            seq_q (_type_): [batch, enc_len] [batch, 中文句子长度]
+            seq_k (_type_): [batch, enc_len]
+          在Decoder_self_att中，seq_q，seq_k 就是dec_input, dec_input
+            seq_q (_type_): [batch, tgt_len] [batch, 英文句子长度]
+            seq_k (_type_): [batch, tgt_len]
+          在Decoder_Encoder_att中，seq_q，seq_k 就是dec_input, enc_input
+            seq_q (_type_): [batch, tgt_len] [batch, 中文句子长度]
+            seq_k (_type_): [batch, enc_len] [batch, 英文句子长度]
+
+    Returns:
+        _type_: [batch_size, len_q, len_k]  T or F
+    """
     batch_size, len_q = seq_q.size()# seq_q 用于升维，为了做attention，mask score矩阵用的
     batch_size, len_k = seq_k.size()
-    pad_attn_mask = seq_k.data.eq(0) # 判断 输入那些含有P(=0),用1标记 [seq_len, model_dim]元素全为T,F
-    pad_attn_mask = pad_attn_mask.unsqueeze(1) #[batch, 1, model_dim]
+    pad_attn_mask = seq_k.data.eq(0) # 判断 输入那些词index含有P(=0),用1标记 [len_k, d_model]元素全为T,F
+    pad_attn_mask = pad_attn_mask.unsqueeze(1) #[batch, 1, len_k]
     pad_attn_mask = pad_attn_mask.expand(batch_size,len_q,len_k)    # 扩展成多维度   [batch_size, len_q, len_k]
     return  pad_attn_mask
 
@@ -113,9 +129,17 @@ def get_attn_pad_mask(seq_q, seq_k):
 预测第一个词"I"；在下一个T1时刻，同时输入"S"和"I"到Decoder预测下一个单词"am"；然后在T2时刻把"S,I,am"同时输入到Decoder预测下一个单
 词"a"，依次把整个句子输入到Decoder,预测出"I am a student E"。
 '''
-def get_attn_subsequence_mask(seq):                               # seq: [batch_size, tgt_len]
+def get_attn_subsequence_mask(seq):
+    """
+    生成上三角Attention矩阵
+    Args:
+        seq (_type_): [batch_size, tgt_len]
+
+    Returns:
+        _type_: _description_
+    """
     attn_shape = [seq.size(0), seq.size(1), seq.size(1)]          # 生成上三角矩阵,[batch_size, tgt_len, tgt_len]
-    subsequence_mask = np.triu(np.ones(attn_shape), k=1)
+    subsequence_mask = np.triu(np.ones(attn_shape), k=1)    # 得到主对角线向上平移一个距离的对角线（下三角包括对角线全为0）
     subsequence_mask = torch.from_numpy(subsequence_mask).byte()  #  [batch_size, tgt_len, tgt_len]
     return subsequence_mask
 
@@ -126,17 +150,21 @@ class ScaledDotProductAttention(nn.Module):
 
     def forward(self, Q, K, V, attn_mask):
         '''
-        :param Q: [batch_size, n_heads, len_src, d_k]
-        :param K: [batch_size, n_heads, len_src, d_k]
-        :param V: [batch_size, n_heads, len_src, d_v(和d_q\d_k不一定一样)]
-        :param attn_mask: [batch_size, n_heads, seq_len, seq_len] attn_mask此时还是T or F
-        :return:
+        注意！： d_q和d_k一定一样
+                d_v和d_q、d_k可以不一样
+                len_k和len_v的长度一定是一样的(翻译任务中，k,v要求都从中文文本生成)
+        :param Q: [batch_size, n_heads, len_q, d_k]
+        :param K: [batch_size, n_heads, len_k, d_k]  len_k和len_v的长度一定是一样的
+        :param V: [batch_size, n_heads, len_v, d_v(和d_q、d_k不一定一样，但d_q和d_k可以一样)]
+        :param attn_mask: [batch_size, n_heads, len_q, len_k] attn_mask此时还是T or F
+
+        :return: [batch_size, n_heads, len_q, d_v], [batch_size, n_heads, len_q, len_k]
         '''
         scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(d_k)   # scores : [batch_size, n_heads, len_q, len_k]
         scores.masked_fill_(attn_mask, -1e9)                           # 如果是停用词P就等于负无穷 在原tensor修改
-        temp  = scores
-        attn = nn.Softmax(dim=-1)(scores)    # mask位置变为0
-        context = torch.matmul(attn, V)                                # [batch_size, n_heads, len_q, d_v]
+        attn = nn.Softmax(dim=-1)(scores)                              # PADmask分数位置变为0
+        # [batch_size, n_heads, len_q, len_k] * [batch_size, n_heads, len_v, d_v] = [batch_size, n_heads, len_q, d_v]
+        context = torch.matmul(attn, V)    # 注意！len_k和len_v的长度一定是一样的
         return context, attn
 
 # 多头自注意力机制
@@ -152,22 +180,25 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, input_Q, input_K, input_V, attn_mask):
         '''QKV同源，都来自enc_inputs
-        :param input_Q: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
-        :param input_K: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
-        :param input_V: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, src_len, d_model]
-        :param attn_mask: enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的位置是要掩码的位置
-        :return:
+        :param input_Q: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, seq_len, d_model]
+        :param input_K: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, seq_len, d_model]
+        :param input_V: enc_inputs: 词嵌入、位置嵌入之后的矩阵 [batch_size, seq_len, d_model]
+        :param attn_mask:
+                        enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的位置是要掩码(PAD填充)的位置
+                        dec_self_attn_mask: [batch_size, tgt_len, tgt_len]元素全为T or F, T的位置是要掩码(PAD填充)的位置
+                        dec_enc_attn_mask: [batch_size, tgt_len, src_len]元素全为T or F, T的位置是要掩码(PAD填充)的位置
+        :return: [batch_size, len_q, d_model]
         '''
         residual, batch_size = input_Q, input_Q.size(0)
         Q = self.W_Q(input_Q).view(batch_size, -1, n_heads, d_k).transpose(1,2)  # Q: [batch_size, n_heads, len_q, d_k]
         K = self.W_K(input_K).view(batch_size, -1, n_heads, d_k).transpose(1,2)  # K: [batch_size, n_heads, len_k, d_k]
-        V = self.W_V(input_V).view(batch_size, -1, n_heads, d_v).transpose(1,2)  # V: [batch_size, n_heads, len_v(=len_k), d_v]
-        attn_mask = attn_mask.unsqueeze(1).repeat(1, n_heads, 1, 1)              # attn_mask : [batch_size, n_heads, seq_len, seq_len]
+        V = self.W_V(input_V).view(batch_size, -1, n_heads, d_v).transpose(1,2)  # V: [batch_size, n_heads, len_v, d_v]
+        attn_mask = attn_mask.unsqueeze(1).repeat(1, n_heads, 1, 1)              # attn_mask : [batch_size, n_heads, len_q, len_k]
         context, attn = ScaledDotProductAttention()(Q, K, V, attn_mask)          # context: [batch_size, n_heads, len_q, d_v]
                                                                                  # attn: [batch_size, n_heads, len_q, len_k]
         # 拼接多头的结果
-        context = context.transpose(1, 2).reshape(batch_size, -1, n_heads * d_v) # context: [batch_size, len_src, n_heads * d_v]
-        output = self.fc(context)                                                # [batch_size, len_q, d_model]
+        context = context.transpose(1, 2).reshape(batch_size, -1, n_heads * d_v) # context: [batch_size, len_q, n_heads * d_v]
+        output = self.fc(context)                                                # d_v fc之后变成d_model -> [batch_size, len_q, d_model]
         return nn.LayerNorm(d_model)(output + residual), attn
 
 
@@ -184,7 +215,7 @@ class FF(nn.Module):
             nn.ReLU(),
             nn.Linear(d_ff, d_model, bias=False))
 
-    def forward(self, inputs):                             # inputs: [batch_size, seq_len, d_model]
+    def forward(self, inputs):    # inputs: [batch_size, seq_len, d_model]
         residual = inputs
         output = self.fc(inputs)
         return nn.LayerNorm(d_model)(output + residual)   # [batch_size, seq_len, d_model]
@@ -199,7 +230,7 @@ class EncoderLayer(nn.Module):
     def forward(self, enc_inputs, enc_self_attn_mask):                                # enc_inputs: [batch_size, src_len, d_model]
         '''
         :param enc_inputs: [batch_size, src_len, d_model] 词嵌入、位置嵌入之后的输入矩阵
-        :param enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的是要掩码的位置
+        :param enc_self_attn_mask: [batch_size, src_len, src_len]元素全为T or F, T的是要掩码（PAD填充）的位置
         :return:
         '''
         #输入3个enc_inputs分别与W_q、W_k、W_v相乘得到Q、K、V                             # enc_self_attn_mask: [batch_size, src_len, src_len]
@@ -235,8 +266,8 @@ class Encoder(nn.Module):
         enc_self_attns = []
         for layer in self.layers:
             # enc_outputs: [batch_size, src_len, d_model], enc_self_attn: [batch_size, n_heads, src_len, src_len]
-            enc_outputs, enc_self_attn = layer(enc_outputs, enc_self_attn_mask)
-            enc_self_attns.append(enc_self_attn)
+            enc_outputs, enc_self_attn = layer(enc_outputs, enc_self_attn_mask)    # 一个EncoderBlock输出,注意力分数矩阵
+            enc_self_attns.append(enc_self_attn)    # 记录注意力分数矩阵
         return enc_outputs, enc_self_attns
 
 
@@ -266,21 +297,29 @@ class DecoderLayer(nn.Module):
         self.dec_enc_attn = MultiHeadAttention()
         self.pos_ffn = FF()
 
-    def forward(self, dec_inputs, enc_outputs, dec_self_attn_mask,
-                dec_enc_attn_mask):  # dec_inputs: [batch_size, tgt_len, d_model]
-        # enc_outputs: [batch_size, src_len, d_model]
-        # dec_self_attn_mask: [batch_size, tgt_len, tgt_len]
-        # dec_enc_attn_mask: [batch_size, tgt_len, src_len]
-        # decoder的self-attention
-        dec_outputs, dec_self_attn = self.dec_self_attn(dec_inputs, dec_inputs,
-                                                        dec_inputs,
-                                                        dec_self_attn_mask)  # dec_outputs: [batch_size, tgt_len, d_model]
+    def forward(self, dec_inputs, enc_outputs, dec_self_attn_mask, dec_enc_attn_mask):  
+        """
+        解码器一个Block包含两个多投资注意力机制
+        Args:
+            dec_inputs (_type_): [batch_size, tgt_len, d_model]
+            enc_outputs (_type_): [batch_size, src_len, d_model]    # Encoder的输出
+            dec_self_attn_mask (_type_): [batch_size, tgt_len, tgt_len]
+            dec_enc_attn_mask (_type_): [batch_size, tgt_len, src_len]
+
+        Returns:
+            _type_: _description_
+        """
+        # dec_outputs: [batch_size, tgt_len, d_model]
         # dec_self_attn: [batch_size, n_heads, tgt_len, tgt_len]
+        dec_outputs, dec_self_attn = self.dec_self_attn(dec_inputs, dec_inputs, dec_inputs,
+                                                        dec_self_attn_mask)
+        
         # decoder自注意力之后的值作为Q值。K,V来自Encoder的输出
-        dec_outputs, dec_enc_attn = self.dec_enc_attn(dec_outputs, enc_outputs,
-                                                      enc_outputs,
-                                                      dec_enc_attn_mask)  # dec_outputs: [batch_size, tgt_len, d_model]
+        # dec_outputs: [batch_size, tgt_len, d_model]
         # dec_enc_attn: [batch_size, h_heads, tgt_len, src_len]
+        dec_outputs, dec_enc_attn = self.dec_enc_attn(dec_outputs, enc_outputs, enc_outputs,
+                                                      dec_enc_attn_mask)
+        
         dec_outputs = self.pos_ffn(dec_outputs)  # dec_outputs: [batch_size, tgt_len, d_model]
         return dec_outputs, dec_self_attn, dec_enc_attn
 
@@ -309,9 +348,12 @@ class Decoder(nn.Module):
         '''
         dec_outputs = self.tgt_emb(dec_inputs)  # [batch_size, tgt_len, d_model]
         dec_outputs = self.pos_emb(dec_outputs.transpose(0, 1)).transpose(0, 1)  # [batch_size, tgt_len, d_model]
-        # Decoder输入序列的pad mask矩阵（这个例子中decoder是没有加pad的，实际应用中都是有pad填充的）
-        dec_self_attn_pad_mask = get_attn_pad_mask(dec_inputs, dec_inputs)  # [batch_size, tgt_len, tgt_len]
-        ''' 'S I like learning P'  'S I am a student'
+        # PAD 0填充Mask掉 (Decoder输入序列的pad mask矩阵（这个例子中decoder是没有加pad的，实际应用中都是有pad填充的）)
+        # Decoder中 0填充的位置是'S'，也就是第一个位置要Mask掉，为true
+        dec_self_attn_pad_mask = get_attn_pad_mask(dec_inputs, dec_inputs)  # [batch_size, tgt_len, tgt_len]  T or F
+        '''
+        此时的一个batch: 'S I like learning P'  'S I am a student'
+        dec_self_attn_pad_mask： 
         tensor([[[ True, False, False, False, False],
                  [ True, False, False, False, False],
                  [ True, False, False, False, False],
@@ -324,8 +366,7 @@ class Decoder(nn.Module):
                  [ True, False, False, False, False],
                  [ True, False, False, False, False]]])'''
         # Masked Self_Attention：当前时刻是看不到未来的信息的
-        dec_self_attn_subsequence_mask = get_attn_subsequence_mask(
-            dec_inputs)  # [batch_size, tgt_len, tgt_len] 下三角包括对角线为0，上三角为1
+        dec_self_attn_subsequence_mask = get_attn_subsequence_mask(dec_inputs)  # [batch_size, tgt_len, tgt_len] 下三角包括对角线为0，上三角为1
         '''
         tensor([[[0, 1, 1, 1, 1],
                  [0, 0, 1, 1, 1],
@@ -339,6 +380,7 @@ class Decoder(nn.Module):
                  [0, 0, 0, 0, 1],
                  [0, 0, 0, 0, 0]]], dtype=torch.uint8)'''
         # Decoder中把两种mask矩阵相加（既屏蔽了pad的信息，也屏蔽了未来时刻的信息）
+        # torch.gt() 比较Tensor1和Tensor2的每一个元素,并返回一个0-1值.若Tensor1中的元素大于Tensor2中的元素,则结果取1,否则取0
         dec_self_attn_mask = torch.gt((dec_self_attn_pad_mask + dec_self_attn_subsequence_mask),
                                       0)  # [batch_size, tgt_len, tgt_len]
         '''tensor([[[ True,  True,  True,  True,  True],
@@ -357,7 +399,10 @@ class Decoder(nn.Module):
         # 要把pad对应的v_i的相关系数设为0，这样注意力就不会关注pad向量)
         #                       dec_inputs只是提供expand的size的
         dec_enc_attn_mask = get_attn_pad_mask(dec_inputs, enc_inputs)  # [batc_size, tgt_len, src_len]
-        '''tensor([[[False, False, False, False, False],
+        '''
+        此时的一个batch: 'S I like learning P'  'S I am a student'
+        下面的tensor是上面两个dec_input样本对应的enc_input的掩码矩阵
+        tensor([[[False, False, False, False, False],
                     [False, False, False, False, False],
                     [False, False, False, False, False],
                     [False, False, False, False, False],
@@ -371,7 +416,9 @@ class Decoder(nn.Module):
 
         dec_self_attns, dec_enc_attns = [], []
         for layer in self.layers:
-            # dec_outputs: [batch_size, tgt_len, d_model], dec_self_attn: [batch_size, n_heads, tgt_len, tgt_len], dec_enc_attn: [batch_size, h_heads, tgt_len, src_len]
+            # dec_outputs: [batch_size, tgt_len, d_model], 
+            # dec_self_attn: [batch_size, n_heads, tgt_len, tgt_len], 
+            # dec_enc_attn: [batch_size, h_heads, tgt_len, src_len]
             dec_outputs, dec_self_attn, dec_enc_attn = layer(dec_outputs, enc_outputs, dec_self_attn_mask,
                                                              dec_enc_attn_mask)
             dec_self_attns.append(dec_self_attn)
@@ -391,16 +438,30 @@ class Transformer(nn.Module):
         super(Transformer, self).__init__()
         self.Encoder = Encoder()
         self.Decoder = Decoder()
+        # 翻译到英文词的分类
         self.projection = nn.Linear(d_model, tgt_vocab_size, bias=False)
 
-    def forward(self, enc_inputs, dec_inputs):  # enc_inputs: [batch_size, src_len]
-        # dec_inputs: [batch_size, tgt_len]
-        enc_outputs, enc_self_attns = self.Encoder(enc_inputs)  # enc_outputs: [batch_size, src_len, d_model],
+    def forward(self, enc_inputs, dec_inputs):
+        """
+        transformer
+        Args:
+            enc_inputs (_type_): [batch_size, src_len]
+            dec_inputs (_type_): [batch_size, tgt_len]
+
+        Returns:
+            _type_: _description_
+        """
+        # encoder部分
+        # enc_outputs: [batch_size, src_len, d_model],
         # enc_self_attns: [n_layers, batch_size, n_heads, src_len, src_len]
-        dec_outputs, dec_self_attns, dec_enc_attns = self.Decoder(
-            dec_inputs, enc_inputs, enc_outputs)  # dec_outpus    : [batch_size, tgt_len, d_model],
+        enc_outputs, enc_self_attns = self.Encoder(enc_inputs)
+
+        # decoder部分
+        # dec_outpus    : [batch_size, tgt_len, d_model],
         # dec_self_attns: [n_layers, batch_size, n_heads, tgt_len, tgt_len],
         # dec_enc_attn  : [n_layers, batch_size, tgt_len, src_len]
+        dec_outputs, dec_self_attns, dec_enc_attns = self.Decoder(dec_inputs, enc_inputs, enc_outputs)
+
         dec_logits = self.projection(dec_outputs)  # dec_logits: [batch_size, tgt_len, tgt_vocab_size]
         dec_logits = dec_logits.view(-1, dec_logits.size(-1))  # dec_logits: [-1(batch_size*tgt_len), tgt_vocab_size]
         return dec_logits, enc_self_attns, dec_self_attns, dec_enc_attns
@@ -422,7 +483,6 @@ for epoch in range(50):
         enc_inputs, dec_inputs, dec_outputs = enc_inputs, dec_inputs, dec_outputs
         outputs, enc_self_attns, dec_self_attns, dec_enc_attns = model(enc_inputs, dec_inputs)
         # dec_outputs: tensor([[3, 4, 5, 6, 1], [3, 7, 8, 2, 1]])
-        temp = dec_outputs.view(-1)
         loss = criterion(outputs, dec_outputs.view(-1))  # outputs: [-1(batch_size*tgt_len), tgt_vocab_size]
         # dec_outputs.view(-1): tensor([3, 4, 5, 6, 1, 3, 7, 8, 2, 1])
         print('Epoch:', '%04d' % (epoch + 1), 'loss =', '{:.6f}'.format(loss))
