@@ -213,7 +213,8 @@ class FF(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_ff, bias=False),
             nn.ReLU(),
-            nn.Linear(d_ff, d_model, bias=False))
+            nn.Linear(d_ff, d_model, bias=False)
+        )
 
     def forward(self, inputs):    # inputs: [batch_size, seq_len, d_model]
         residual = inputs
@@ -352,7 +353,7 @@ class Decoder(nn.Module):
         # Decoder中 0填充的位置是'S'，也就是第一个位置要Mask掉，为true
         dec_self_attn_pad_mask = get_attn_pad_mask(dec_inputs, dec_inputs)  # [batch_size, tgt_len, tgt_len]  T or F
         '''
-        此时的一个batch: 'S I like learning P'  'S I am a student'
+        此时的一个batch:['S I am a student', 'S I like learning P']
         dec_self_attn_pad_mask： 
         tensor([[[ True, False, False, False, False],
                  [ True, False, False, False, False],
@@ -385,7 +386,7 @@ class Decoder(nn.Module):
                                       0)  # [batch_size, tgt_len, tgt_len]
         '''tensor([[[ True,  True,  True,  True,  True],
                     [ True, False,  True,  True,  True],
-                    [ True, False, False,  True,  True],
+                    [ True, False, False,  True,  True],    # 注意到之前的，当然不包括开始字符'S'
                     [ True, False, False, False,  True],
                     [ True, False, False, False, False]],
 
@@ -402,17 +403,17 @@ class Decoder(nn.Module):
         '''
         此时的一个batch: 'S I like learning P'  'S I am a student'
         下面的tensor是上面两个dec_input样本对应的enc_input的掩码矩阵
-        tensor([[[False, False, False, False, False],
-                    [False, False, False, False, False],
-                    [False, False, False, False, False],
-                    [False, False, False, False, False],
-                    [False, False, False, False, False]],
+        tensor([[[False, False, False, False,  True],
+                [False, False, False, False,  True],
+                [False, False, False, False,  True],
+                [False, False, False, False,  True],
+                [False, False, False, False,  True]],
 
-                    [False, False, False, False,  True],
-                    [False, False, False, False,  True],
-                    [False, False, False, False,  True],
-                    [False, False, False, False,  True],
-                    [False, False, False, False,  True]]])'''
+                [[False, False, False, False, False],
+                [False, False, False, False, False],
+                [False, False, False, False, False],
+                [False, False, False, False, False],
+                [False, False, False, False, False]]])'''
 
         dec_self_attns, dec_enc_attns = [], []
         for layer in self.layers:
@@ -502,12 +503,13 @@ def test(model, enc_input, start_symbol):
         dec_outputs, _, _ = model.Decoder(dec_input, enc_input, enc_outputs)
         projected = model.projection(dec_outputs)
         prob = projected.squeeze(0).max(dim=-1, keepdim=False)[1]
-        next_word = prob.data[i]
+        next_word = prob.data[i]    # 不断地预测下一个字
         next_symbol = next_word.item()
     return dec_input
 
 
 enc_inputs, _, _ = next(iter(loader))
+# dec_input全部预测出来之后，在输入Model预测 dec_output
 predict_dec_input = test(model, enc_inputs[1].view(1, -1), start_symbol=tgt_vocab["S"])
 predict, _, _, _ = model(enc_inputs[1].view(1, -1), predict_dec_input)
 predict = predict.data.max(1, keepdim=True)[1]
