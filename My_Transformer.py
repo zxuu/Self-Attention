@@ -403,17 +403,18 @@ class Decoder(nn.Module):
         '''
         此时的一个batch: 'S I like learning P'  'S I am a student'
         下面的tensor是上面两个dec_input样本对应的enc_input的掩码矩阵
-        tensor([[[False, False, False, False,  True],
-                [False, False, False, False,  True],
-                [False, False, False, False,  True],
-                [False, False, False, False,  True],
-                [False, False, False, False,  True]],
-
-                [[False, False, False, False, False],
-                [False, False, False, False, False],
-                [False, False, False, False, False],
-                [False, False, False, False, False],
-                [False, False, False, False, False]]])'''
+        tensor([[[False, False, False, False, False],
+                 [False, False, False, False, False],
+                 [False, False, False, False, False],
+                 [False, False, False, False, False],
+                 [False, False, False, False, False]]
+            
+                [[False, False, False, False,  True],
+                 [False, False, False, False,  True],
+                 [False, False, False, False,  True],
+                 [False, False, False, False,  True],
+                 [False, False, False, False,  True]]
+               ])'''
 
         dec_self_attns, dec_enc_attns = [], []
         for layer in self.layers:
