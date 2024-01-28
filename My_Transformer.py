@@ -506,7 +506,7 @@ def test(model, enc_input, start_symbol):
         dec_input[0][i] = next_symbol
         dec_outputs, _, _ = model.Decoder(dec_input, enc_input, enc_outputs)    # [1, tgt_len, d_model]
         projected = model.projection(dec_outputs)    # [1, tgt_len, tgt_voc_size]
-        prob = projected.squeeze(0).max(dim=-1, keepdim=False)[1]    # [tgt_len]
+        prob = projected.squeeze(0).max(dim=-1, keepdim=False)[1]    # [tgt_len][索引]
         next_word = prob.data[i]    # 不断地预测所有字，但是只取下一个字
         next_symbol = next_word.item()
     return dec_input
