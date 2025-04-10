@@ -1,8 +1,17 @@
 # Self-Attention（pytorch实现）
-参考这篇博客[手撕Transformer Transformer输入输出细节以及代码实现（pytorch）](https://blog.51cto.com/u_14300986/5467368)  
+transformer开山之作：[Attention is all you need](https://arxiv.org/abs/1706.03762)
+代码参考这篇博客[手撕Transformer Transformer输入输出细节以及代码实现（pytorch）](https://blog.51cto.com/u_14300986/5467368)  
 <div align=center>
-<img src="./Pictures/transformer.png" width="300"/>
+<img src="./Pictures/transformer-architecture.png" width="300"/>
 </div>
+
+1. decoder中，查询来自Decoder，键和值来自Encoder的输出。encoder的输出作为decoder的K,V的来源
+2. 解码器一个Block包含两个多头自注意力机制：
+   - Masked Multi-Head Attention：decoder输入文本每个token只能观察到前面的token，因此需要mask。
+   - Multi-Head Attention：decoder输出文本每个token可以观察到encoder的所有token，因此不需要mask。
+
+---
+
 **OneHead文件夹**下是单头自注意力机制的实现(无Mask)  
 **MultiHead文件夹**下是多头自注意力机制的实现(无Mask)  
 **Encoder文件夹**下是Ecoder编码器的完整实现（有mask）  
