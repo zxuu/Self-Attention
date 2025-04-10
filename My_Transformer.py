@@ -307,7 +307,7 @@ class DecoderLayer(nn.Module):
 
     def forward(self, dec_inputs, enc_outputs, dec_self_attn_mask, dec_enc_attn_mask):  
         """
-        解码器一个Block包含两个多投资注意力机制
+        解码器一个Block包含两个多头自注意力机制
         Args:
             dec_inputs (_type_): [batch_size, tgt_len, d_model]
             enc_outputs (_type_): [batch_size, src_len, d_model]    # Encoder的输出
@@ -512,8 +512,7 @@ def test(model, enc_input, start_symbol):
 
     for i in range(0, tgt_len):
         dec_input[0][i] = next_symbol
-
-        # 然后一个一个解码
+        # decode出下一个字
         dec_outputs, _, _ = model.Decoder(dec_input, enc_input, enc_outputs)    # [1, tgt_len, d_model]
 
         projected = model.projection(dec_outputs)    # [1, tgt_len, tgt_voc_size]
